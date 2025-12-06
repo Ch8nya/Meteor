@@ -1,14 +1,10 @@
 /**
  * useMeteor - The AI Brain Hook
  * 
- * Manages the complete lifecycle of the Ministral 3B model:
+ * Manages the complete lifecycle of the LLM model:
  * 1. WebGPU compatibility check
  * 2. Model download with progress tracking
  * 3. Text generation with streaming
- * 
- * This hook is designed to be called ONCE in the root component
- * and passed down via context or props. The model stays loaded
- * as long as the Side Panel is open.
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
@@ -25,30 +21,32 @@ import {
 env.allowLocalModels = false;
 env.useBrowserCache = true;
 env.allowRemoteModels = true;
-// Let Vite bundle handle WASM files automatically
 
-// Model configuration - Llama 3.2 3B (transformers.js compatible)
-// Note: Ministral 3B uses 'mistral3' architecture not yet supported by transformers.js
-// Using Llama 3.2 3B as equivalent - same size, excellent quality
+// Point to local WASM files (copied by vite-plugin-static-copy)
+if (env.backends?.onnx?.wasm) {
+  env.backends.onnx.wasm.wasmPaths = chrome.runtime.getURL('wasm/');
+}
+
+// Model configuration - Llama 3.2 3B (fully supported by transformers.js)
 const MODEL_ID = 'onnx-community/Llama-3.2-3B-Instruct-ONNX';
 
 // Model states
 export type MeteorStatus = 
-  | 'idle'           // Initial state
-  | 'checking'       // Checking WebGPU compatibility
-  | 'downloading'    // Downloading model weights
-  | 'loading'        // Loading model into memory
-  | 'ready'          // Model loaded and ready
-  | 'generating'     // Currently generating text
-  | 'error';         // Something went wrong
+  | 'idle'
+  | 'checking'
+  | 'downloading'
+  | 'loading'
+  | 'ready'
+  | 'generating'
+  | 'error';
 
 export interface MeteorState {
   status: MeteorStatus;
-  progress: number;           // 0-100 for download progress
-  progressText: string;       // Human readable progress
-  error: string | null;       // Error message if any
-  isReady: boolean;           // Convenience flag
-  isGenerating: boolean;      // Convenience flag
+  progress: number;
+  progressText: string;
+  error: string | null;
+  isReady: boolean;
+  isGenerating: boolean;
 }
 
 export interface MeteorActions {
@@ -69,9 +67,6 @@ export function useMeteor(): UseMeteorReturn {
   const modelRef = useRef<PreTrainedModel | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  /**
-   * Check WebGPU compatibility
-   */
   const checkWebGPU = useCallback(async (): Promise<boolean> => {
     if (!navigator.gpu) {
       throw new Error(
@@ -91,12 +86,9 @@ export function useMeteor(): UseMeteorReturn {
     return true;
   }, []);
 
-  /**
-   * Initialize the model
-   */
   const initialize = useCallback(async () => {
     if (status === 'ready' || status === 'loading' || status === 'downloading') {
-      return; // Already initialized or in progress
+      return;
     }
 
     try {
@@ -104,25 +96,20 @@ export function useMeteor(): UseMeteorReturn {
       setError(null);
       setProgress(0);
 
-      // Check WebGPU compatibility
       await checkWebGPU();
       setProgressText('WebGPU detected ✓');
 
       setStatus('downloading');
       setProgressText('Preparing to download model...');
 
-      // Track overall progress across all files
       const fileProgress: Record<string, number> = {};
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const progressCallback = (event: any) => {
         if (event.status === 'progress' && event.progress !== undefined && event.file) {
           fileProgress[event.file] = event.progress;
-          
-          // Calculate average progress across all tracked files
           const values = Object.values(fileProgress);
           const avgProgress = values.reduce((a, b) => a + b, 0) / Math.max(values.length, 1);
-          
           setProgress(Math.round(avgProgress));
           setProgressText(`Downloading: ${Math.round(avgProgress)}%`);
         } else if (event.status === 'done' && event.file) {
@@ -130,7 +117,6 @@ export function useMeteor(): UseMeteorReturn {
         }
       };
 
-      // Load tokenizer first (smaller, faster)
       setProgressText('Loading tokenizer...');
       tokenizerRef.current = await AutoTokenizer.from_pretrained(MODEL_ID, {
         progress_callback: progressCallback,
@@ -139,8 +125,6 @@ export function useMeteor(): UseMeteorReturn {
       setStatus('loading');
       setProgressText('Loading model into GPU memory...');
 
-      // Load model with WebGPU and quantization settings
-      // Using q4 for broader hardware compatibility
       modelRef.current = await AutoModelForCausalLM.from_pretrained(MODEL_ID, {
         device: 'webgpu',
         dtype: 'q4',
@@ -160,9 +144,6 @@ export function useMeteor(): UseMeteorReturn {
     }
   }, [status, checkWebGPU]);
 
-  /**
-   * Generate text from a prompt
-   */
   const generate = useCallback(async (
     prompt: string,
     onToken: (token: string) => void
@@ -179,25 +160,21 @@ export function useMeteor(): UseMeteorReturn {
     abortControllerRef.current = new AbortController();
 
     try {
-      // Format as chat messages for Mistral
-      const messages = [
-        { role: 'user', content: prompt }
-      ];
+      const messages = [{ role: 'user', content: prompt }];
 
-      // Apply chat template
-      const inputText = tokenizerRef.current.apply_chat_template(messages, {
+      const formattedPrompt = tokenizerRef.current.apply_chat_template(messages, {
         add_generation_prompt: true,
         tokenize: false,
-      }) as string;
+      });
 
-      // Tokenize
-      const inputs = tokenizerRef.current(inputText, {
+      const inputs = tokenizerRef.current(formattedPrompt, {
         return_tensors: 'pt',
+        padding: true,
+        truncation: true,
       });
 
       let generatedText = '';
 
-      // Create streamer
       const streamer = new TextStreamer(tokenizerRef.current, {
         skip_prompt: true,
         skip_special_tokens: true,
@@ -207,7 +184,6 @@ export function useMeteor(): UseMeteorReturn {
         },
       });
 
-      // Generate
       await modelRef.current.generate({
         ...inputs,
         max_new_tokens: 1024,
@@ -223,7 +199,7 @@ export function useMeteor(): UseMeteorReturn {
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         setStatus('ready');
-        return ''; // Aborted, not an error
+        return '';
       }
       
       console.error('[Meteor] Generation failed:', err);
@@ -233,9 +209,6 @@ export function useMeteor(): UseMeteorReturn {
     }
   }, [status]);
 
-  /**
-   * Abort current generation
-   */
   const abort = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -246,7 +219,6 @@ export function useMeteor(): UseMeteorReturn {
     }
   }, [status]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       abort();
@@ -265,4 +237,3 @@ export function useMeteor(): UseMeteorReturn {
     abort,
   };
 }
-
