@@ -22,12 +22,6 @@ env.allowLocalModels = false;
 env.useBrowserCache = true;
 env.allowRemoteModels = true;
 
-// Point to local WASM files and disable threading (extension compatibility)
-if (env.backends?.onnx?.wasm) {
-  env.backends.onnx.wasm.wasmPaths = chrome.runtime.getURL('wasm/');
-  env.backends.onnx.wasm.numThreads = 1; // Disable threading
-}
-
 // Model configuration - Llama 3.2 3B (fully supported by transformers.js)
 const MODEL_ID = 'onnx-community/Llama-3.2-3B-Instruct-ONNX';
 
@@ -97,8 +91,9 @@ export function useMeteor(): UseMeteorReturn {
       setError(null);
       setProgress(0);
 
-      // Skip WebGPU check for WASM testing
-      setProgressText('Using WASM backend (CPU)');
+      // Check WebGPU support
+      await checkWebGPU();
+      setProgressText('WebGPU supported!');
 
       setStatus('downloading');
       setProgressText('Preparing to download model...');
@@ -126,9 +121,24 @@ export function useMeteor(): UseMeteorReturn {
       setStatus('loading');
       setProgressText('Loading model into GPU memory...');
 
-      // Test with WASM/CPU backend to isolate if WebGPU is the issue
+      // Configure WASM paths for Chrome extension (CDN blocked)
+      const wasmPath = chrome.runtime.getURL('wasm/');
+      console.log('[Meteor] Setting WASM path:', wasmPath);
+      
+      // Access onnxruntime-web's env through transformers.js
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const onnxEnv = (env as any).backends?.onnx?.wasm;
+      if (onnxEnv) {
+        onnxEnv.wasmPaths = wasmPath;
+        onnxEnv.numThreads = 1;
+        console.log('[Meteor] WASM config applied');
+      } else {
+        console.warn('[Meteor] Could not configure WASM paths - env.backends.onnx.wasm not available');
+      }
+
+      // Load model with WebGPU
       modelRef.current = await AutoModelForCausalLM.from_pretrained(MODEL_ID, {
-        device: 'wasm',  // CPU fallback - slower but more compatible
+        device: 'webgpu',
         dtype: 'q4',
         progress_callback: progressCallback,
       });
