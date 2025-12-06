@@ -21,11 +21,7 @@ import {
 env.allowLocalModels = false;
 env.useBrowserCache = true;
 env.allowRemoteModels = true;
-
-// Point to local WASM files (copied by vite-plugin-static-copy)
-if (env.backends?.onnx?.wasm) {
-  env.backends.onnx.wasm.wasmPaths = chrome.runtime.getURL('wasm/');
-}
+// Note: Vite bundles WASM automatically, let it handle paths
 
 // Model configuration - Llama 3.2 3B (fully supported by transformers.js)
 const MODEL_ID = 'onnx-community/Llama-3.2-3B-Instruct-ONNX';
@@ -125,9 +121,10 @@ export function useMeteor(): UseMeteorReturn {
       setStatus('loading');
       setProgressText('Loading model into GPU memory...');
 
+      // Try with explicit device selection
       modelRef.current = await AutoModelForCausalLM.from_pretrained(MODEL_ID, {
         device: 'webgpu',
-        dtype: 'q4',
+        dtype: 'q4f16',
         progress_callback: progressCallback,
       });
 
