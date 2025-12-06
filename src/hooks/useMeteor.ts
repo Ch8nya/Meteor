@@ -6,30 +6,24 @@
  * 2. Model download with progress tracking
  * 3. Text generation with streaming
  * 
- * Based on Mistral's official WebGPU demo:
- * https://huggingface.co/spaces/mistralai/Ministral_3B_WebGPU
+ * This hook is designed to be called ONCE in the root component
+ * and passed down via context or props. The model stays loaded
+ * as long as the Side Panel is open.
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { 
-  AutoProcessor,
-  AutoModelForImageTextToText,
+  AutoTokenizer, 
+  AutoModelForCausalLM,
   TextStreamer,
-  env,
+  type PreTrainedTokenizer,
+  type PreTrainedModel,
 } from '@huggingface/transformers';
 
-// Configure transformers.js for Chrome extension environment
-env.allowLocalModels = false;
-env.useBrowserCache = true;
-env.allowRemoteModels = true;
-
-// Point to local WASM files (copied by vite-plugin-static-copy)
-if (env.backends?.onnx?.wasm) {
-  env.backends.onnx.wasm.wasmPaths = chrome.runtime.getURL('wasm/');
-}
-
-// Model configuration - Official Mistral ONNX model
-const MODEL_ID = 'mistralai/Ministral-3-3B-Instruct-2512-ONNX';
+// Model configuration - Llama 3.2 3B (transformers.js compatible)
+// Note: Ministral 3B uses 'mistral3' architecture not yet supported by transformers.js
+// Using Llama 3.2 3B as equivalent - same size, excellent quality
+const MODEL_ID = 'onnx-community/Llama-3.2-3B-Instruct-ONNX';
 
 // Model states
 export type MeteorStatus = 
@@ -64,10 +58,8 @@ export function useMeteor(): UseMeteorReturn {
   const [progressText, setProgressText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const processorRef = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const modelRef = useRef<any>(null);
+  const tokenizerRef = useRef<PreTrainedTokenizer | null>(null);
+  const modelRef = useRef<PreTrainedModel | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   /**
@@ -131,23 +123,20 @@ export function useMeteor(): UseMeteorReturn {
         }
       };
 
-      // Load processor (handles tokenization for Ministral)
-      setProgressText('Loading processor...');
-      processorRef.current = await AutoProcessor.from_pretrained(MODEL_ID, {
+      // Load tokenizer first (smaller, faster)
+      setProgressText('Loading tokenizer...');
+      tokenizerRef.current = await AutoTokenizer.from_pretrained(MODEL_ID, {
         progress_callback: progressCallback,
       });
 
       setStatus('loading');
       setProgressText('Loading model into GPU memory...');
 
-      // Load model with WebGPU - using AutoModelForImageTextToText for mistral3 architecture
-      modelRef.current = await AutoModelForImageTextToText.from_pretrained(MODEL_ID, {
+      // Load model with WebGPU and quantization settings
+      // Using q4 for broader hardware compatibility
+      modelRef.current = await AutoModelForCausalLM.from_pretrained(MODEL_ID, {
         device: 'webgpu',
-        dtype: {
-          embed_tokens: 'fp16',
-          vision_encoder: 'q4',
-          decoder_model_merged: 'q4f16',
-        },
+        dtype: 'q4',
         progress_callback: progressCallback,
       });
 
@@ -171,7 +160,7 @@ export function useMeteor(): UseMeteorReturn {
     prompt: string,
     onToken: (token: string) => void
   ): Promise<string> => {
-    if (!processorRef.current || !modelRef.current) {
+    if (!tokenizerRef.current || !modelRef.current) {
       throw new Error('Model not initialized. Call initialize() first.');
     }
 
@@ -183,29 +172,26 @@ export function useMeteor(): UseMeteorReturn {
     abortControllerRef.current = new AbortController();
 
     try {
-      // Format as chat messages for Ministral
+      // Format as chat messages for Mistral
       const messages = [
         { role: 'user', content: prompt }
       ];
 
-      // Apply chat template to format the prompt correctly
-      const formattedPrompt = processorRef.current.apply_chat_template(messages, {
+      // Apply chat template
+      const inputText = tokenizerRef.current.apply_chat_template(messages, {
         add_generation_prompt: true,
         tokenize: false,
-      });
+      }) as string;
 
-      // For text-only input, use the tokenizer directly from the processor
-      // Don't pass image parameter - just tokenize the text
-      const inputs = processorRef.current.tokenizer(formattedPrompt, {
+      // Tokenize
+      const inputs = tokenizerRef.current(inputText, {
         return_tensors: 'pt',
-        padding: true,
-        truncation: true,
       });
 
       let generatedText = '';
 
-      // Create streamer for token-by-token output
-      const streamer = new TextStreamer(processorRef.current.tokenizer, {
+      // Create streamer
+      const streamer = new TextStreamer(tokenizerRef.current, {
         skip_prompt: true,
         skip_special_tokens: true,
         callback_function: (token: string) => {
@@ -214,7 +200,7 @@ export function useMeteor(): UseMeteorReturn {
         },
       });
 
-      // Generate response
+      // Generate
       await modelRef.current.generate({
         ...inputs,
         max_new_tokens: 1024,
@@ -272,3 +258,4 @@ export function useMeteor(): UseMeteorReturn {
     abort,
   };
 }
+
