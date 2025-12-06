@@ -42,7 +42,7 @@
     "https://cdn-lfs-us-1.huggingface.co/*"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https: blob: data:"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; worker-src 'self' blob:; connect-src 'self' https: blob: data:"
   },
   "web_accessible_resources": [
     {
