@@ -25,11 +25,7 @@ import {
 env.allowLocalModels = false;
 env.useBrowserCache = true;
 env.allowRemoteModels = true;
-
-// Use local WASM files - critical for Chrome extension (CDN imports blocked)
-if (env.backends?.onnx?.wasm) {
-  env.backends.onnx.wasm.wasmPaths = chrome.runtime.getURL('wasm/');
-}
+// Let Vite bundle handle WASM files automatically
 
 // Model configuration - Llama 3.2 3B (transformers.js compatible)
 // Note: Ministral 3B uses 'mistral3' architecture not yet supported by transformers.js
