@@ -8,23 +8,15 @@ export default defineConfig({
   plugins: [
     react(),
     crx({ manifest }),
-    // Copy ONNX runtime files to dist without hashing
+    // Copy ONNX runtime files from transformers.js package (matching versions)
     viteStaticCopy({
       targets: [
         {
-          src: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm',
+          src: 'node_modules/@huggingface/transformers/dist/ort-wasm-simd-threaded.jsep.wasm',
           dest: 'wasm'
         },
         {
-          src: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm',
-          dest: 'wasm'
-        },
-        {
-          src: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs',
-          dest: 'wasm'
-        },
-        {
-          src: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs',
+          src: 'node_modules/@huggingface/transformers/dist/ort-wasm-simd-threaded.jsep.mjs',
           dest: 'wasm'
         }
       ]
