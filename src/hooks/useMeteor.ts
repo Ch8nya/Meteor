@@ -16,9 +16,20 @@ import {
   AutoTokenizer, 
   AutoModelForCausalLM,
   TextStreamer,
+  env,
   type PreTrainedTokenizer,
   type PreTrainedModel,
 } from '@huggingface/transformers';
+
+// Configure transformers.js for Chrome extension environment
+env.allowLocalModels = false;
+env.useBrowserCache = true;
+env.allowRemoteModels = true;
+
+// Point to local WASM files (copied by vite-plugin-static-copy)
+if (env.backends?.onnx?.wasm) {
+  env.backends.onnx.wasm.wasmPaths = chrome.runtime.getURL('wasm/');
+}
 
 // Model configuration - Llama 3.2 3B (transformers.js compatible)
 // Note: Ministral 3B uses 'mistral3' architecture not yet supported by transformers.js
