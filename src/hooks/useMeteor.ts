@@ -22,9 +22,10 @@ env.allowLocalModels = false;
 env.useBrowserCache = true;
 env.allowRemoteModels = true;
 
-// Point to local WASM files
+// Point to local WASM files and disable threading (extension compatibility)
 if (env.backends?.onnx?.wasm) {
   env.backends.onnx.wasm.wasmPaths = chrome.runtime.getURL('wasm/');
+  env.backends.onnx.wasm.numThreads = 1; // Disable threading
 }
 
 // Model configuration - Llama 3.2 3B (fully supported by transformers.js)
