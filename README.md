@@ -185,7 +185,7 @@ const NOISY_TAGS = ['script', 'style', 'nav', 'footer', 'svg', ...];
 
 MIT
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - [Transformers.js](https://huggingface.co/docs/transformers.js) by Hugging Face
 - [Mistral AI](https://mistral.ai/) for Ministral 3B
