@@ -1,17 +1,17 @@
-# Meteor - Local AI Browser Assistant
+# Meteor - Completely Local AI Browser Assistant
 
 Run **Ministral 3B** entirely locally in your browser using WebGPU. Summarize pages, analyze text — all private, all local. No data leaves your device.
 
 ![Meteor Banner](./docs/banner.png)
 
-## ✨ Features
+##  Features
 
 - **100% Local**: The entire AI model runs in your browser. No API calls, no cloud processing.
 - **WebGPU Accelerated**: Leverages your GPU for fast inference.
 - **Privacy First**: Your data never leaves your device.
 - **Page Summarization**: Instantly summarize any webpage with one click.
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 
@@ -27,14 +27,7 @@ Run **Ministral 3B** entirely locally in your browser using WebGPU. Summarize pa
 cd meteor
 npm install
 ```
-
-2. **Generate extension icons:**
-
-```bash
-npm run generate-icons
-```
-
-Or manually add 16x16, 48x48, and 128x128 PNG icons to the `icons/` folder.
+2. nvm skip this shi
 
 3. **Build the extension:**
 
@@ -59,7 +52,7 @@ npm run build
    - Wait for the model to download (~2.5GB, happens once)
    - Start summarizing!
 
-## 🏗️ Architecture
+##  Architecture
 
 ### The "Fat Side Panel" Pattern
 
@@ -102,7 +95,7 @@ npm run build
 5. Side Panel wraps content in prompt template
 6. WebGPU model generates response, streams tokens to UI
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 | Component | Technology |
 |-----------|------------|
@@ -113,7 +106,7 @@ npm run build
 | Styling | Tailwind CSS |
 | Model | Ministral 3B (Q4 Quantized) |
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 meteor/
@@ -142,7 +135,7 @@ meteor/
 └── package.json
 ```
 
-## ⚙️ Configuration
+##  Configuration
 
 ### Model Settings (in `useMeteor.ts`)
 
@@ -162,7 +155,7 @@ const MAX_CONTENT_LENGTH = 15000; // Prevents WebGPU OOM
 const NOISY_TAGS = ['script', 'style', 'nav', 'footer', 'svg', ...];
 ```
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### "WebGPU is not supported"
 
@@ -181,14 +174,14 @@ const NOISY_TAGS = ['script', 'style', 'nav', 'footer', 'svg', ...];
 - Cannot read `chrome://` or `chrome-extension://` pages
 - Some sites block content scripts (banking, etc.)
 
-## 🔒 Privacy
+##  Privacy
 
 - **No network requests**: After initial model download, zero network activity
 - **No telemetry**: No analytics, no tracking
 - **Local storage only**: Model cached in browser's IndexedDB
 - **Open source**: Audit the code yourself
 
-## 📝 License
+##  License
 
 MIT
 
